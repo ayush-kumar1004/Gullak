@@ -113,11 +113,11 @@ function hasFinancialCategory(text) {
     'split', 'share', 'pool', 'contribute', 'owes me', 'owes',
     'repay', 'repaid', 'repayment', 'repayments', 'paid back', 'pay back', 'debt settlement',
     'reimburse', 'claim', 'settlement',
-    'invest', 'investment', 'stocks', 'mutual fund', 'transfer'
+    'invest', 'investment', 'stocks', 'mutual fund', 'transfer',
+    'डिनर', 'लंच', 'खाना', 'नाश्ता', 'पार्टी', 'शॉपिंग', 'खर्चा', 'किराया', 'रेंट', 'उधार', 'लोन', 'वापस'
   ];
   return categories.some(c => {
-    const regex = new RegExp(`\\b${c}\\b`, 'i');
-    return regex.test(t);
+    return t.includes(c);
   });
 }
 
@@ -849,7 +849,7 @@ class FinancialReconciliationEngine {
       }
     }
     // Check for Rent / Rent Repayment intent
-    else if (/\b(rent|kiraya|room rent|flat rent|house rent|landlord)\b/i.test(text)) {
+    else if (/\b(rent|kiraya|room rent|flat rent|house rent|landlord)\b/i.test(text) || text.includes('किराया') || text.includes('रेंट')) {
       classification = 'RENT_REPAYMENT';
       consumption = 0;
       confidence = 0.98;
@@ -867,7 +867,7 @@ class FinancialReconciliationEngine {
       });
     }
     // Check for Loan intent
-    else if (/\b(lend|lent|loan|udhaar)\b/i.test(text) || (/\bborrow\b/i.test(text) && !text.includes('from me'))) {
+    else if (/\b(lend|lent|loan|udhaar)\b/i.test(text) || (/\bborrow\b/i.test(text) && !text.includes('from me')) || text.includes('उधार') || text.includes('लोन')) {
       classification = 'LOAN';
       consumption = 0;
       loan = amount;
@@ -889,7 +889,8 @@ class FinancialReconciliationEngine {
     }
     // Check for Split intent (e.g. "dinner split", "Rahul owes me ₹500", "dinner for me and Rahul")
     else if (/\b(split|share|pool|contribute|owes me|owes)\b/i.test(text) ||
-             text.includes('for me and') || text.includes('dinner for me and') || text.includes('lunch for me and')) {
+             text.includes('for me and') || text.includes('dinner for me and') || text.includes('lunch for me and') ||
+             text.includes('स्प्लिट') || text.includes('शेयर')) {
       classification = 'SPLIT';
       confidence = 0.95;
 
@@ -952,7 +953,8 @@ class FinancialReconciliationEngine {
              text.includes('grocery') || text.includes('shopping') || text.includes('coffee') || text.includes('cafe') || text.includes('drink') ||
              text.includes('party') || text.includes('cab') || text.includes('uber') || text.includes('ride') || text.includes('personal') ||
              text.includes('spent') || text.includes('bought') || text.includes('purchased') || text.includes('consumption') ||
-             text.includes('my expense') || text.includes('my spending')) {
+             text.includes('my expense') || text.includes('my spending') ||
+             text.includes('डिनर') || text.includes('लंच') || text.includes('खाना') || text.includes('नाश्ता') || text.includes('पार्टी') || text.includes('शॉपिंग') || text.includes('खर्चा') || text.includes('खर्च')) {
       classification = 'CONSUMPTION';
       consumption = amount;
       confidence = 0.98;

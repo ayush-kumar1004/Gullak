@@ -353,7 +353,11 @@ app.post('/api/v1/voice/reconcile_voice_pipeline', async (req, res) => {
     responseText = `₹${fmtAmt} ka split note kar liya hai. Aapka share ₹${userShareAmt} personal consumption hai aur ₹${splitRecAmt} receivable hai.`;
   } else {
     // UNKNOWN / Clarification required
-    responseText = `Transaction ko ₹0 budget impact ke saath hold kiya hai. Kripya clarify karein ki yeh kharcha kis cheez ke liye tha.`;
+    if (amount > 0) {
+      responseText = `₹${fmtAmt} ka kharcha note kiya hai. Kripya batayein ki yeh payment kiske liye aur kis cheez ke liye thi?`;
+    } else {
+      responseText = `Aapne "${transcript}" kaha. Kripya amount aur transaction ki poori detail batayein.`;
+    }
   }
 
   // Step 6: Text-to-Speech (TTS)

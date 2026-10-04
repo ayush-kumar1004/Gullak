@@ -57,7 +57,11 @@ class GnaniVoiceRail {
         clearTimeout(timer);
 
         if (!response.ok) {
-          throw new Error(`Gnani STT API Error: ${response.status} ${response.statusText}`);
+          let errDetail = '';
+          try {
+            errDetail = await response.text();
+          } catch (_) {}
+          throw new Error(`Gnani STT API Error: ${response.status} ${response.statusText} ${errDetail ? '- ' + errDetail : ''}`);
         }
 
         const data = await response.json();
@@ -230,18 +234,21 @@ class GnaniVoiceRail {
     let userShare = null;
 
     // 1. Detect Intent: REPAYMENT takes precedence when return/repay keywords are present
-    if (/\b(wapas|lautaya|repaid|paid back|chuka diya|settled the loan|returned)\b/i.test(text) || text.includes('borrowed from me') || text.includes('udhaar liye the')) {
+    if (/\b(wapas|lautaya|repaid|paid back|chuka diya|settled the loan|returned)\b/i.test(text) ||
+        text.includes('वापस') || text.includes('लौटा') || text.includes('चुका') ||
+        text.includes('borrowed from me') || text.includes('udhaar liye the')) {
       intent = 'REPAYMENT';
-    } else if (/\b(udhaar|loan|lent|lend|borrowed|borrow)\b/i.test(text)) {
+    } else if (/\b(udhaar|loan|lent|lend|borrowed|borrow)\b/i.test(text) || text.includes('उधार') || text.includes('लोन')) {
       intent = 'LOAN';
-    } else if (/\b(split|share|mera share|portion|contribute|pool|owes me)\b/i.test(text) || text.includes('dosto me') || text.includes('me split')) {
+    } else if (/\b(split|share|mera share|portion|contribute|pool|owes me)\b/i.test(text) || text.includes('dosto me') || text.includes('me split') || text.includes('स्प्लिट') || text.includes('शेयर')) {
       intent = 'SPLIT';
-    } else if (/\b(dinner|lunch|breakfast|food|meal|grocery|shopping|coffee|cafe|swiggy|zomato|party|cab|uber)\b/i.test(text)) {
+    } else if (/\b(dinner|lunch|breakfast|food|meal|grocery|shopping|coffee|cafe|swiggy|zomato|party|cab|uber)\b/i.test(text) ||
+               text.includes('डिनर') || text.includes('लंच') || text.includes('खाना') || text.includes('पार्टी') || text.includes('नाश्ता') || text.includes('शॉपिंग')) {
       intent = 'CONSUMPTION';
     } else if (/\b(reimburse|reimbursement|claim)\b/i.test(text)) {
       intent = 'REIMBURSEMENT';
-    } else if (/\b(transfer|bheje|sent|diye)\b/i.test(text)) {
-      if (text.includes('udhaar') || text.includes('loan')) {
+    } else if (/\b(transfer|bheje|sent|diye)\b/i.test(text) || text.includes('भेजे') || text.includes('दिए')) {
+      if (text.includes('udhaar') || text.includes('loan') || text.includes('उधार')) {
         intent = 'LOAN';
       } else {
         intent = 'TRANSFER';
@@ -249,36 +256,53 @@ class GnaniVoiceRail {
     }
 
     // 2. Extract Amount
-    // Hindi spoken number idioms
-    if (text.includes('pandrah sau') || text.includes('dedh hazaar') || text.includes('dedh hazar')) {
+    // Hindi spoken number idioms (Latin + Devanagari)
+    if (text.includes('pandrah sau') || text.includes('dedh hazaar') || text.includes('dedh hazar') || text.includes('पंद्रह सौ') || text.includes('डेढ़ हज़ार') || text.includes('डेढ़ हजार')) {
       amount = 1500;
-    } else if (text.includes('barah sau')) {
+    } else if (text.includes('barah sau') || text.includes('बारह सौ')) {
       amount = 1200;
-    } else if (text.includes('sau')) {
-      const sauMatch = text.match(/\b(ek|do|teen|char|paanch|chhe|saat|aath|nau)\s+sau\b/);
+    } else if (text.includes('sau') || text.includes('सौ')) {
+      const sauMatch = text.match(/\b(ek|do|teen|char|paanch|chhe|saat|aath|nau)\s+sau\b/) ||
+                       text.match(/(एक|दो|तीन|चार|पांच|पाँच|छह|सात|आठ|नौ)\s*सौ/);
       if (sauMatch) {
-        const wordMap = { ek: 100, do: 200, teen: 300, char: 400, paanch: 500, chhe: 600, saat: 700, aath: 800, nau: 900 };
+        const wordMap = {
+          ek: 100, do: 200, teen: 300, char: 400, paanch: 500, chhe: 600, saat: 700, aath: 800, nau: 900,
+          'एक': 100, 'दो': 200, 'तीन': 300, 'चार': 400, 'पांच': 500, 'पाँच': 500, 'छह': 600, 'सात': 700, 'आठ': 800, 'नौ': 900
+        };
         amount = wordMap[sauMatch[1]];
       }
     }
     if (!amount) {
-      if (text.includes('do hazaar') || text.includes('do hazar')) {
+      if (text.includes('do hazaar') || text.includes('do hazar') || text.includes('दो हज़ार') || text.includes('दो हजार')) {
         amount = 2000;
-      } else if (text.includes('dhai hazaar') || text.includes('dhai hazar')) {
+      } else if (text.includes('dhai hazaar') || text.includes('dhai hazar') || text.includes('ढाई हज़ार') || text.includes('ढाई हजार')) {
         amount = 2500;
-      } else if (text.includes('hazaar') || text.includes('hazar')) {
-        const hazarMatch = text.match(/\b(ek|do|teen|char|paanch|das)\s+haz(?:aa)?r\b/);
+      } else if (text.includes('hazaar') || text.includes('hazar') || text.includes('हज़ार') || text.includes('हजार')) {
+        const hazarMatch = text.match(/\b(ek|do|teen|char|paanch|das)\s+haz(?:aa)?r\b/) ||
+                           text.match(/(एक|दो|तीन|चार|पांच|पाँच|दस)\s*(?:हज़ार|हजार)/);
         if (hazarMatch) {
-          const map = { ek: 1000, do: 2000, teen: 3000, char: 4000, paanch: 5000, das: 10000 };
+          const map = {
+            ek: 1000, do: 2000, teen: 3000, char: 4000, paanch: 5000, das: 10000,
+            'एक': 1000, 'दो': 2000, 'तीन': 3000, 'चार': 4000, 'पांच': 5000, 'पाँच': 5000, 'दस': 10000
+          };
           amount = map[hazarMatch[1]];
         }
       }
     }
-    // Regex for numeric amount e.g. "800", "₹1000", "500", "4000"
+    // Regex for numeric amount e.g. "800", "₹1000", "500", "4000" or Devanagari numerals
     if (!amount) {
       const match = text.match(/(?:₹|rs\.?|inr)?\s*(\d+(?:,\d+)*(?:\.\d+)?)/);
       if (match && match[1]) {
         amount = parseFloat(match[1].replace(/,/g, ''));
+      }
+    }
+    // Devanagari digits: ०-९
+    if (!amount) {
+      const devMatch = text.match(/[०-९]+/);
+      if (devMatch) {
+        const devDigits = { '०': '0', '१': '1', '२': '2', '३': '3', '४': '4', '५': '5', '६': '6', '७': '7', '८': '8', '९': '9' };
+        const numStr = devMatch[0].split('').map(d => devDigits[d] || d).join('');
+        amount = parseFloat(numStr);
       }
     }
 

@@ -708,29 +708,14 @@
       });
     }
 
-    let mediaRecorder = null;
-    let audioChunks = [];
-    let recordStartTime = null;
-    let recordTimerInterval = null;
-
-    // Check Gnani Voice Integration Status on load
-    async function checkVoiceStatus() {
-      try {
-        const res = await fetch('/api/v1/voice/status');
-        const st = await res.json();
-        const metaEl = document.getElementById('voiceServiceMeta');
-        if (st.is_live) {
-          metaEl.innerHTML = `<span style="color: #34d399;">● Live Gnani AI Connected</span> &bull; STT: Vachana v3 &bull; TTS: Timbre v2.5`;
-        } else {
-          metaEl.innerHTML = `<span style="color: #fbbf24;">● Gnani Ready (Dev Mode)</span> &bull; Natural Hinglish Parser & Direct Synthesis`;
-        }
-      } catch (err) {
-        // silent fail
-      }
-    }
+    let audioContext = null;
+    let audioStream = null;
+    let scriptProcessor = null;
+    let pcmSamples = [];
+    let isCurrentlyRecording = false;
 
     async function toggleRecording() {
-      if (mediaRecorder && mediaRecorder.state === 'recording') {
+      if (isCurrentlyRecording) {
         stopRecording();
       } else {
         startRecording();
@@ -750,44 +735,34 @@
           return;
         }
 
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        
-        let mimeType = 'audio/webm;codecs=opus';
-        if (!MediaRecorder.isTypeSupported(mimeType)) {
-          mimeType = 'audio/webm';
-          if (!MediaRecorder.isTypeSupported(mimeType)) {
-            mimeType = ''; // Let browser pick default
+        audioStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            channelCount: 1,
+            sampleRate: 16000,
+            echoCancellation: true,
+            noiseSuppression: true
           }
-        }
+        });
 
-        mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-        audioChunks = [];
+        // Initialize AudioContext at 16kHz mono (Standard for Gnani STT)
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        audioContext = new AudioCtx({ sampleRate: 16000 });
+        const source = audioContext.createMediaStreamSource(audioStream);
 
-        mediaRecorder.ondataavailable = (event) => {
-          if (event.data && event.data.size > 0) {
-            audioChunks.push(event.data);
-          }
+        // 4096 buffer size
+        scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+        pcmSamples = [];
+
+        scriptProcessor.onaudioprocess = (e) => {
+          if (!isCurrentlyRecording) return;
+          const inputData = e.inputBuffer.getChannelData(0);
+          pcmSamples.push(new Float32Array(inputData));
         };
 
-        mediaRecorder.onstop = async () => {
-          clearInterval(recordTimerInterval);
-          micBtn.classList.remove('recording');
-          micIcon.textContent = '⏳';
-          statusText.textContent = 'Processing audio through Gnani pipeline...';
-          stopBtn.style.display = 'none';
+        source.connect(scriptProcessor);
+        scriptProcessor.connect(audioContext.destination);
 
-          // Stop all audio tracks
-          stream.getTracks().forEach(track => track.stop());
-
-          const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
-          await sendAudioToPipeline(audioBlob, mediaRecorder.mimeType || 'audio/webm');
-
-          micIcon.textContent = '🎙️';
-          statusText.textContent = 'Click microphone to speak';
-          durationEl.style.display = 'none';
-        };
-
-        mediaRecorder.start(250); // collect 250ms chunks
+        isCurrentlyRecording = true;
         recordStartTime = Date.now();
         durationEl.textContent = '00:00';
         durationEl.style.display = 'inline-block';
@@ -810,9 +785,90 @@
     }
 
     function stopRecording() {
-      if (mediaRecorder && mediaRecorder.state === 'recording') {
-        mediaRecorder.stop();
+      if (!isCurrentlyRecording) return;
+      isCurrentlyRecording = false;
+      clearInterval(recordTimerInterval);
+
+      const micBtn = document.getElementById('recordMicBtn');
+      const micIcon = document.getElementById('micIcon');
+      const statusText = document.getElementById('voiceStatusText');
+      const durationEl = document.getElementById('voiceDuration');
+      const stopBtn = document.getElementById('stopRecordBtn');
+
+      micBtn.classList.remove('recording');
+      micIcon.textContent = '⏳';
+      statusText.textContent = 'Processing audio through Gnani pipeline...';
+      stopBtn.style.display = 'none';
+
+      // Disconnect audio nodes and stop tracks
+      if (scriptProcessor) scriptProcessor.disconnect();
+      if (audioStream) audioStream.getTracks().forEach(t => t.stop());
+      if (audioContext && audioContext.state !== 'closed') audioContext.close();
+
+      // Encode captured PCM float samples into standard 16-bit mono 16kHz WAV
+      const wavBlob = encodeWAV(pcmSamples, 16000);
+      sendAudioToPipeline(wavBlob, 'audio/wav');
+
+      micIcon.textContent = '🎙️';
+      statusText.textContent = 'Click microphone to speak';
+      durationEl.style.display = 'none';
+    }
+
+    // Pure JS 16-bit PCM WAV Encoder (Mono, 16kHz)
+    function encodeWAV(samplesArrays, sampleRate = 16000) {
+      let totalLength = 0;
+      for (const arr of samplesArrays) totalLength += arr.length;
+
+      const flat = new Float32Array(totalLength);
+      let offset = 0;
+      for (const arr of samplesArrays) {
+        flat.set(arr, offset);
+        offset += arr.length;
       }
+
+      const buffer = new ArrayBuffer(44 + flat.length * 2);
+      const view = new DataView(buffer);
+
+      function writeString(view, offset, string) {
+        for (let i = 0; i < string.length; i++) {
+          view.setUint8(offset + i, string.charCodeAt(i));
+        }
+      }
+
+      /* RIFF identifier */
+      writeString(view, 0, 'RIFF');
+      /* file length */
+      view.setUint32(4, 36 + flat.length * 2, true);
+      /* RIFF type & format chunk */
+      writeString(view, 8, 'WAVEfmt ');
+      /* format chunk length */
+      view.setUint32(16, 16, true);
+      /* sample format (raw PCM) */
+      view.setUint16(20, 1, true);
+      /* channel count (1 = mono) */
+      view.setUint16(22, 1, true);
+      /* sample rate */
+      view.setUint32(24, sampleRate, true);
+      /* byte rate (sampleRate * 1 * 2) */
+      view.setUint32(28, sampleRate * 2, true);
+      /* block align (1 * 2) */
+      view.setUint16(32, 2, true);
+      /* bits per sample */
+      view.setUint16(34, 16, true);
+      /* data chunk identifier */
+      writeString(view, 36, 'data');
+      /* data chunk length */
+      view.setUint32(40, flat.length * 2, true);
+
+      // Write PCM 16-bit samples
+      let index = 44;
+      for (let i = 0; i < flat.length; i++) {
+        let s = Math.max(-1, Math.min(1, flat[i]));
+        view.setInt16(index, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+        index += 2;
+      }
+
+      return new Blob([view], { type: 'audio/wav' });
     }
 
     async function sendAudioToPipeline(blob, mimeType) {

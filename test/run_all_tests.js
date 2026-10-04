@@ -133,8 +133,8 @@ async function runAll() {
 
     // 7. Contradiction Override Tests
     await executeSuite('Contradiction Override Tests', async () => {
-      delete require.cache[require.resolve('./test_contradiction_override')];
-      require('./test_contradiction_override');
+       const { runContradictionOverrideTests } = require('./test_contradiction_override');
+       await runContradictionOverrideTests();
     });
 
     // 8. Gnani Voice Pipeline Tests

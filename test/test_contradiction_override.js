@@ -325,7 +325,11 @@ async function runContradictionOverrideTests() {
   console.log('=============================================================================');
 }
 
-runContradictionOverrideTests().catch(err => {
-  console.error('\n❌ Test failed with error:', err);
-  process.exit(1);
-});
+if (require.main === module) {
+  runContradictionOverrideTests().catch(err => {
+    console.error('\n❌ Test failed with error:', err);
+    process.exit(1);
+  });
+}
+
+module.exports = { runContradictionOverrideTests };
