@@ -1,0 +1,611 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Gullak Autonomous Personal Finance Reconciliation API",
+    "description": "Custom capabilities backend for Pine Labs AgenticOrg Agent Aashi. Provides Counterparty Memory Graph with contradiction detection, P2P Reconciliation Engine, and Adaptive Budgeting with Savings Protection.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Public Gateway (Dynamically replaced by server with public HTTPS host)"
+    }
+  ],
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "operationId": "get_system_health",
+        "summary": "Health and integration status check",
+        "description": "Returns operational status, confidence floor (0.88), and partner rail statuses.",
+        "responses": {
+          "200": {
+            "description": "Server is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string" },
+                    "agent_name": { "type": "string" },
+                    "confidence_floor": { "type": "number" },
+                    "rails": { "type": "object" },
+                    "local_acceptance_benchmark": { "type": "string" },
+                    "agenticorg_shadow_status": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/memory/counterparty": {
+      "get": {
+        "operationId": "check_counterparty_memory",
+        "summary": "Retrieve counterparty semantic memory",
+        "description": "Fetches relationship history, typical intent, and outstanding loan balances for a specific person or VPA. CRITICAL: Memory provides historical context ONLY. DO NOT use stored counterparty memory to classify a separate transaction when user only confirmed it is not a duplicate without stating a new purpose.",
+        "parameters": [
+          {
+            "name": "identifier",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Name or VPA of counterparty (e.g. 'Rahul' or 'rahul@oksbi')"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Memory retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "found": { "type": "boolean" },
+                    "counterparty": { "type": "object" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing required identifier parameter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "record_counterparty_memory",
+        "summary": "Record or update counterparty memory",
+        "description": "Commits confirmed user clarification to the counterparty graph so the agent never asks the same question twice.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["counterparty"],
+                "properties": {
+                  "counterparty": { "type": "string", "description": "Name of the person" },
+                  "vpa": { "type": "string", "description": "UPI VPA if known" },
+                  "classification": { "type": "string", "description": "Confirmed intent: LOAN, SPLIT, etc." },
+                  "relationship": { "type": "string", "description": "e.g. friend, roommate, colleague" },
+                  "notes": { "type": "string", "description": "Contextual notes" },
+                  "confidence": { "type": "number", "default": 0.95 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Memory updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string" },
+                    "message": { "type": "string" },
+                    "record": { "type": "object" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reconcile/transaction": {
+      "post": {
+        "operationId": "reconcile_transaction",
+        "summary": "Reconcile transaction intent and personal consumption",
+        "description": "Deconstructs a bank transaction into genuine personal consumption vs loans, splits, transfers, repayments, and savings. Returns explainable confidence and flags if Human-In-The-Loop clarification is required. CRITICAL: When resolving a duplicate without a new purpose, classification remains UNKNOWN, confidence < 0.88, budget_impact = 0, and duplicate_resolved = true.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["amount", "direction"],
+                "properties": {
+                  "transaction_id": { "type": "string", "description": "Unique transaction ID" },
+                  "amount": { "type": "number", "description": "Gross amount in INR" },
+                  "direction": { "type": "string", "enum": ["DEBIT", "CREDIT"], "description": "Debit or Credit" },
+                  "counterparty": { "type": "string", "description": "Name of merchant or person" },
+                  "channel": { "type": "string", "description": "Payment channel: UPI, IMPS, NEFT, CARD, NETBANKING" },
+                  "vpa": { "type": "string", "description": "UPI ID if available" },
+                  "raw_narration": { "type": "string", "description": "Bank statement raw text, narration, or transaction description (e.g. 'dinner', 'I paid Rahul ₹500 for dinner')" },
+                  "user_clarification": { "type": "string", "description": "Explicit user statement, transaction purpose, or clarification describing this transaction (e.g. 'I paid Rahul ₹500 for dinner', 'Rahul owes me ₹500', or duplicate confirmation 'I confirm this is a separate transaction, not a duplicate')" },
+                  "delhivery_status": { "type": "string", "description": "Optional logistics delivery status" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reconciliation result with confidence and HITL trigger flag",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "transaction_id": { "type": "string" },
+                    "counterparty": { "type": "string" },
+                    "channel": { "type": "string" },
+                    "category": { "type": "string" },
+                    "classification": { "type": "string" },
+                    "confidence": { "type": "number" },
+                    "confidence_floor": { "type": "number" },
+                    "confidence_breakdown": { "type": "object" },
+                    "requires_clarification": { "type": "boolean" },
+                    "requiresClarification": { "type": "boolean" },
+                    "question": { "type": "string" },
+                    "consumption_amount": { "type": "number" },
+                    "consumptionImpact": { "type": "number" },
+                    "budget_impact": { "type": "number" },
+                    "budgetImpact": { "type": "number" },
+                    "amountReceivable": { "type": "number" },
+                    "amountOwed": { "type": "number" },
+                    "explanation": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing required fields (amount, direction)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/budget/adapt": {
+      "post": {
+        "operationId": "adapt_daily_budget",
+        "summary": "Adapt daily budget and shield monthly savings target",
+        "description": "Calculates smooth daily budget adjustments across remaining days and locks the savings target as inviolable. Fail-closed: Rejects any mutation unless classification is CONSUMPTION, confidence >= 0.88, and actual_personal_spending > 0.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["actual_personal_spending", "classification", "confidence"],
+                "properties": {
+                  "actual_personal_spending": { "type": "number", "description": "Actual verified personal consumption only" },
+                  "classification": { "type": "string", "description": "Transaction classification. Must be 'CONSUMPTION' to mutate budget." },
+                  "confidence": { "type": "number", "description": "Classification confidence score. Must be >= 0.88 to mutate budget." },
+                  "planned_daily_budget": { "type": "number", "description": "Current planned daily budget" },
+                  "remaining_days": { "type": "integer", "description": "Days remaining in billing cycle" },
+                  "transaction_id": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Budget adaptation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string" },
+                    "budget_mutated": { "type": "boolean" },
+                    "budget_impact": { "type": "number" },
+                    "actual_personal_spending": { "type": "number" },
+                    "overspend": { "type": "number" },
+                    "previous_daily_budget": { "type": "number" },
+                    "new_daily_budget": { "type": "number" },
+                    "daily_adjustment": { "type": "number" },
+                    "savings_goal_protected": { "type": "boolean" },
+                    "savings_goal_amount": { "type": "number" },
+                    "requires_user_tradeoff": { "type": "boolean" },
+                    "tradeoff_options": { "type": "array", "items": { "type": "string" } },
+                    "reason": { "type": "string" },
+                    "explanation": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing actual_personal_spending parameter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/budget/tradeoff": {
+      "post": {
+        "operationId": "authorize_budget_tradeoff",
+        "summary": "Authorize budget tradeoff decision",
+        "description": "Deterministically authorizes BUFFER or TEMPORARY_ADJUSTMENT when a SAVINGS_PROTECTION_ALERT is active, while strictly shielding the inviolable ₹15,000 monthly savings goal.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["tradeoff_type"],
+                "properties": {
+                  "tradeoff_type": { "type": "string", "enum": ["BUFFER", "TEMPORARY_ADJUSTMENT"] },
+                  "minimum_daily_budget": { "type": "number", "description": "Emergency daily budget floor for TEMPORARY_ADJUSTMENT" },
+                  "overspend_amount": { "type": "number", "description": "Overspend amount to absorb" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tradeoff authorization result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string" },
+                    "authorized": { "type": "boolean" },
+                    "authorization_status": { "type": "string" },
+                    "previous_budget": { "type": "number" },
+                    "new_budget": { "type": "number" },
+                    "selected_tradeoff": { "type": "string" },
+                    "savings_goal": { "type": "number" },
+                    "savings_goal_protected": { "type": "boolean" },
+                    "explanation": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/budget/status": {
+      "get": {
+        "operationId": "check_budget_status",
+        "summary": "Retrieve current budget and savings status",
+        "description": "Returns current daily allowance, monthly savings goal, and cycle days remaining.",
+        "responses": {
+          "200": {
+            "description": "Budget state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user_id": { "type": "string" },
+                    "monthly_savings_goal": { "type": "number" },
+                    "planned_daily_budget": { "type": "number" },
+                    "current_daily_budget": { "type": "number" },
+                    "remaining_days": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/packages/json": {
+      "get": {
+        "operationId": "track_delhivery_shipment",
+        "summary": "Delhivery package tracking (official schema)",
+        "description": "Corroborates ambiguous e-commerce debits against logistics delivery state (Delivered, Returned, In Transit).",
+        "parameters": [
+          {
+            "name": "waybill",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "ref_ids",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delhivery package tracking response matching official schema"
+          },
+          "400": {
+            "description": "Missing waybill or ref_ids parameter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Waybill not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Delhivery gateway error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/voice/status": {
+      "get": {
+        "operationId": "get_voice_status",
+        "summary": "Check Gnani.ai voice rail integration status",
+        "description": "Returns voice provider configuration, live vs unconfigured status, STT/TTS endpoints, supported models and languages.",
+        "responses": {
+          "200": {
+            "description": "Voice status object",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "provider": { "type": "string" },
+                    "is_live": { "type": "boolean" },
+                    "mode": { "type": "string" },
+                    "stt_endpoint": { "type": "string" },
+                    "tts_endpoint": { "type": "string" },
+                    "supported_models": { "type": "array", "items": { "type": "string" } },
+                    "language_codes": { "type": "array", "items": { "type": "string" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/voice/stt": {
+      "post": {
+        "operationId": "transcribe_speech",
+        "summary": "Speech-to-Text audio transcription",
+        "description": "Accepts base64-encoded audio (WebM or WAV) and transcribes using Gnani Indic STT v3.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "audio_base64": { "type": "string", "description": "Base64-encoded audio data" },
+                  "mime_type": { "type": "string", "example": "audio/webm" },
+                  "language": { "type": "string", "example": "hi-IN" },
+                  "transcript": { "type": "string", "description": "Optional direct transcript for testing" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transcription result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string" },
+                    "transcript": { "type": "string", "nullable": true },
+                    "confidence": { "type": "number" },
+                    "language": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/voice/reconcile_voice_pipeline": {
+      "post": {
+        "operationId": "reconcile_voice_pipeline",
+        "summary": "Unified End-to-End Voice Financial Reconciliation Pipeline",
+        "description": "Chains audio transcription -> Hinglish entity parsing -> Authoritative Reconciliation -> Budget Adaptation -> Natural Response Generation -> Gnani TTS speech synthesis.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "audio_base64": { "type": "string", "description": "Base64-encoded audio clip" },
+                  "mime_type": { "type": "string", "example": "audio/webm" },
+                  "language": { "type": "string", "example": "hi-IN" },
+                  "transcript": { "type": "string", "description": "Direct transcript bypass" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Unified pipeline result including transcript, parsed entities, reconciliation record, response text, and TTS synthesis",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string" },
+                    "transcript": { "type": "string", "nullable": true },
+                    "parsed": { "type": "object" },
+                    "reconciliation": { "type": "object" },
+                    "response_text": { "type": "string" },
+                    "tts": { "type": "object" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

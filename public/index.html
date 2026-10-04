@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gullak | Autonomous Financial Reconciliation Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(18, 24, 38, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-hover: rgba(255, 255, 255, 0.12);
+      --accent: #6366f1;
+      --accent-glow: rgba(99, 102, 241, 0.25);
+      --success: #10b981;
+      --success-glow: rgba(16, 185, 129, 0.2);
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --font: 'Outfit', -apple-system, sans-serif;
+      --mono: 'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.08) 0px, transparent 50%);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100vh;
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--card-border);
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo-badge {
+      width: 46px;
+      height: 46px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #6366f1, #10b981);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 22px;
+      box-shadow: 0 8px 24px var(--accent-glow);
+    }
+
+    .brand h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
+    .brand p { font-size: 13px; color: var(--text-muted); }
+
+    .platform-status {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--card-bg);
+      padding: 8px 16px;
+      border-radius: 999px;
+      border: 1px solid var(--card-border);
+      font-size: 12px;
+      backdrop-filter: blur(10px);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 10px var(--success);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.9); }
+    }
+
+    /* Key Metric Cards */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .metric-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 18px;
+      backdrop-filter: blur(12px);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .metric-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--card-hover);
+    }
+
+    .metric-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    .metric-value {
+      font-size: 26px;
+      font-weight: 700;
+      font-family: var(--mono);
+    }
+
+    .metric-tag {
+      font-size: 11px;
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .text-emerald { color: var(--success); }
+    .text-indigo { color: #818cf8; }
+    .text-amber { color: var(--warning); }
+    .text-rose { color: var(--danger); }
+
+    /* Action Banner */
+    .banner {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(16, 185, 129, 0.15));
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 16px;
+      padding: 18px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+
+    .banner-text h3 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+    .banner-text p { font-size: 13px; color: var(--text-muted); }
+
+    .btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn:hover {
+      background: #4f46e5;
+      box-shadow: 0 4px 16px var(--accent-glow);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--card-border);
+      color: var(--text);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    /* Main Grid Layout */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .dashboard-grid { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 20px;
+      backdrop-filter: blur(12px);
+      margin-bottom: 24px;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .panel-title {
+      font-size: 16px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Ledger Table */
+    .ledger-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .ledger-table th {
+      text-align: left;
+      padding: 10px 12px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--card-border);
+      font-weight: 500;
+    }
+
+    .ledger-table td {
+      padding: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      vertical-align: middle;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .badge-loan { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .badge-consumption { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .badge-split { background: rgba(99, 102, 241, 0.15); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.3); }
+    .badge-repayment { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .badge-transfer { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.3); }
+    .badge-saving { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+    .badge-unknown { background: rgba(236, 72, 153, 0.15); color: #f472b6; border: 1px solid rgba(236, 72, 153, 0.3); }
+
+    /* Counterparty Cards */
+    .cp-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .cp-info h4 { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+    .cp-info p { font-size: 12px; color: var(--text-muted); }
+
+    /* Voice Chips */
+    .chip-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .chip {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .chip:hover {
+      background: rgba(99, 102, 241, 0.2);
+      border-color: var(--accent);
+    }
+
+    /* Voice Recording Interaction */
+    .voice-control-box {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .voice-btn-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .mic-btn {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      border: 2px solid var(--accent);
+      background: linear-gradient(135deg, #4f46e5, #6366f1);
+      color: white;
+      font-size: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 16px var(--accent-glow);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      outline: none;
+    }
+
+    .mic-btn:hover {
+      transform: scale(1.06);
+      border-color: #a5b4fc;
+    }
+
+    .mic-btn.recording {
+      background: linear-gradient(135deg, #dc2626, #ef4444);
+      border-color: #f87171;
+      animation: mic-pulse 1.4s infinite;
+      box-shadow: 0 0 24px rgba(239, 68, 68, 0.5);
+    }
+
+    @keyframes mic-pulse {
+      0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+      70% { transform: scale(1.08); box-shadow: 0 0 0 14px rgba(239, 68, 68, 0); }
+      100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+
+    .voice-status-meta {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .voice-status-title {
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .voice-status-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .voice-result-box {
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 10px;
+      padding: 12px;
+      font-size: 13px;
+      display: none;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .voice-result-box.active {
+      display: block;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .modal {
+      background: #131b2e;
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      border-radius: 20px;
+      width: 90%;
+      max-width: 520px;
+      padding: 24px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="logo-badge">G</div>
+      <div>
+        <h1>Gullak <span style="font-size: 13px; font-weight: 500; color: #818cf8; margin-left: 6px;">v1.0.0</span></h1>
+        <p>Autonomous Financial Reconciliation Agent | Pine Labs AgenticOrg</p>
+      </div>
+    </div>
+    <div class="platform-status">
+      <div class="status-dot"></div>
+      <span><strong>Agent Aashi</strong>: AP Processor</span>
+      <span style="color: var(--card-border);">|</span>
+      <span>Confidence Floor: <strong>88%</strong></span>
+      <span style="color: var(--card-border);">|</span>
+      <span class="text-emerald">Local Acceptance: 20/20 (100%)</span>
+      <span style="color: var(--card-border);">|</span>
+      <span class="text-amber">Live Shadow: 0/20 Samples</span>
+    </div>
+  </header>
+
+  <!-- Metrics Grid -->
+  <div class="metrics-grid">
+    <div class="metric-card">
+      <div class="metric-label">Gross Cash Outflow</div>
+      <div class="metric-value text-rose" id="metricOutflow">₹0</div>
+      <div class="metric-tag text-rose">Total money moved out of bank</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Actual Personal Spending</div>
+      <div class="metric-value text-emerald" id="metricConsumption">₹0</div>
+      <div class="metric-tag text-emerald">Genuine user consumption</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Money Passed Through</div>
+      <div class="metric-value text-indigo" id="metricPassedThrough">₹0</div>
+      <div class="metric-tag text-indigo">Loans + Transfers + Fronted Splits</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Discrepancy Eliminated</div>
+      <div class="metric-value text-amber" id="metricDiscrepancy">₹0</div>
+      <div class="metric-tag text-amber">Prevented false budget cuts</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Inviolable Savings Target</div>
+      <div class="metric-value text-emerald" id="metricSavings">₹15,000</div>
+      <div class="metric-tag text-emerald">100% Protected (Shield Active)</div>
+    </div>
+  </div>
+
+  <!-- Promotion Banner -->
+  <div class="banner">
+    <div class="banner-text">
+      <h3>🧪 Gullak Local Backend Acceptance Benchmark</h3>
+      <p>Scope: 20 Acceptance Tests (Loans, Splits, Contradictions, Duplicates, Timeouts, Refusals) | <strong>Local: 20/20 PASSED (100%)</strong> | <em>AgenticOrg Live Shadow: 0/20 Pending Platform Execution</em></p>
+    </div>
+    <div style="display: flex; gap: 10px;">
+      <button class="btn" id="runBenchmarkBtn" onclick="triggerBenchmark()">
+        <span>▶</span> Run 20 Local Acceptance Tests
+      </button>
+      <a href="/openapi.json" target="_blank" class="btn btn-secondary">
+        📄 View OpenAPI 3.0
+      </a>
+    </div>
+  </div>
+
+  <!-- Dashboard Grid -->
+  <div class="dashboard-grid">
+    <!-- Left Column: Reconciled Transactions & Voice Ingestion -->
+    <div>
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span>🎙️ Gnani Voice Rail & Transaction Ingestion</span>
+          </div>
+          <span style="font-size: 12px; color: var(--text-muted);">Hindi / Hinglish / English STT</span>
+        </div>
+        <div class="voice-control-box">
+          <div class="voice-btn-row">
+            <button class="mic-btn" id="recordMicBtn" onclick="toggleRecording()" title="Click to speak">
+              <span id="micIcon">🎙️</span>
+            </button>
+            <div class="voice-status-meta">
+              <div class="voice-status-title">
+                <span id="voiceStatusText">Click microphone to speak</span>
+                <span id="voiceDuration" style="font-family: var(--mono); font-size: 11px; color: #f87171; display: none;">00:00</span>
+              </div>
+              <div class="voice-status-sub" id="voiceServiceMeta">
+                Gnani Indic Voice Rail (STT: Vachana v3 &bull; TTS: Timbre v2.5)
+              </div>
+            </div>
+            <button class="btn btn-secondary" id="stopRecordBtn" onclick="stopRecording()" style="display: none; padding: 6px 12px; font-size: 12px;">
+              ⏹️ Stop & Process
+            </button>
+          </div>
+
+          <div class="voice-result-box" id="voiceResultBox">
+            <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 4px;">Voice Transcript</div>
+            <div id="voiceTranscriptText" style="font-weight: 500; margin-bottom: 8px; color: #f8fafc;"></div>
+            
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
+              <span id="voiceIntentBadge" class="badge badge-split">Intent: -</span>
+              <span id="voiceCounterpartyBadge" class="badge" style="background: rgba(99, 102, 241, 0.2); color: #818cf8;">Contact: -</span>
+              <span id="voiceBudgetImpactBadge" class="badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399;">Budget: ₹0</span>
+            </div>
+
+            <div style="font-size: 12px; color: #94a3b8; margin-bottom: 8px;" id="voiceResponseMsg"></div>
+            <audio id="ttsAudioPlayer" controls style="width: 100%; height: 32px; display: none; margin-top: 6px;"></audio>
+          </div>
+        </div>
+
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">
+          Or click any natural Hinglish sample to test the pipeline immediately:
+        </p>
+        <div class="chip-container">
+          <div class="chip" onclick="simulateVoice('Rahul ko pandrah sau diye the, loan tha.')">
+            🗣️ "Rahul ko pandrah sau diye the, loan tha."
+          </div>
+          <div class="chip" onclick="simulateVoice('Aman ne 500 wapas kar diye jo usne mujhse udhaar liye the.')">
+            🗣️ "Aman ne 500 wapas kar diye..."
+          </div>
+          <div class="chip" onclick="simulateVoice('Neha ko 600 dinner ke liye diye.')">
+            🗣️ "Neha ko 600 dinner ke liye diye."
+          </div>
+          <div class="chip" onclick="simulateVoice('Maine 1000 dinner ka diya, mera share 500 tha.')">
+            🗣️ "1000 dinner split, mera share 500"
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span>📊 Reconciled Financial Ledger</span>
+          </div>
+          <span id="ledgerCountBadge" class="badge badge-split">20 Entries Reconciled</span>
+        </div>
+        <div style="overflow-x: auto;">
+          <table class="ledger-table">
+            <thead>
+              <tr>
+                <th>Date / Txn</th>
+                <th>Counterparty / Narration</th>
+                <th>Gross Amount</th>
+                <th>Reconciled Intent</th>
+                <th>Confidence</th>
+                <th>Consumption</th>
+              </tr>
+            </thead>
+            <tbody id="ledgerTableBody">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Memory Graph & Adaptive Budget Shield -->
+    <div>
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span>🧠 Counterparty Memory Graph</span>
+          </div>
+          <span class="badge badge-saving">Capability 1</span>
+        </div>
+        <div id="memoryListContainer">
+          <!-- Rendered via JS -->
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span>🛡️ Adaptive Daily Budget & Savings Shield</span>
+          </div>
+          <span class="badge badge-repayment">Capability 3</span>
+        </div>
+        <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 14px; margin-bottom: 14px;">
+          <div style="font-size: 12px; font-weight: 600; color: #34d399; margin-bottom: 4px;">SAVINGS SHIELD: ACTIVE & INVIOLABLE</div>
+          <div style="font-size: 13px; color: var(--text);">
+            Monthly Target: <strong>₹15,000.00</strong> | Never silently reduced. Overspends are smoothed across remaining 10 days of the cycle.
+          </div>
+        </div>
+        <div style="font-size: 13px; line-height: 1.8;">
+          <div>Planned Daily Allowance: <strong id="budgetPlanned">₹300.00</strong></div>
+          <div>Current Daily Budget: <strong id="budgetCurrent" class="text-indigo">₹300.00</strong></div>
+          <div>Days Remaining: <strong id="budgetDays">10</strong></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HITL Clarification Modal -->
+  <div class="modal-overlay" id="hitlModal">
+    <div class="modal">
+      <h3 style="font-size: 18px; margin-bottom: 8px;">🤔 Clarification Required (HITL)</h3>
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px;">
+        Confidence (52%) is below the platform's 88% floor. Gullak will not guess.
+      </p>
+      <div style="background: rgba(255, 255, 255, 0.05); padding: 12px; border-radius: 10px; font-size: 14px; margin-bottom: 16px;" id="hitlQuestionText">
+        "Ayush, what was the ₹1,500 sent to Rahul for?"
+      </div>
+      <input type="text" id="hitlInput" placeholder="e.g., I lent him the money" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--card-border); background: #0c1322; color: white; margin-bottom: 14px; font-family: var(--font);">
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button class="btn" onclick="submitClarification()">Confirm & Remember</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function loadData() {
+      try {
+        const res = await fetch('/api/v1/ledger');
+        const data = await res.json();
+        renderLedger(data.ledger || []);
+        renderSummary(data.summary || {});
+
+        const memRes = await fetch('/api/v1/memory/all');
+        const memData = await memRes.json();
+        renderMemories(memData.memories || []);
+
+        const bRes = await fetch('/api/v1/budget/status');
+        const bData = await bRes.json();
+        document.getElementById('budgetPlanned').textContent = '₹' + bData.planned_daily_budget.toFixed(2);
+        document.getElementById('budgetCurrent').textContent = '₹' + bData.current_daily_budget.toFixed(2);
+        document.getElementById('budgetDays').textContent = bData.remaining_days;
+      } catch (err) {
+        console.error('Error loading data:', err);
+      }
+    }
+
+    function renderSummary(summary) {
+      if (!summary) return;
+      document.getElementById('metricOutflow').textContent = '₹' + (summary.total_cash_outflow || 0).toLocaleString('en-IN');
+      document.getElementById('metricConsumption').textContent = '₹' + (summary.actual_personal_consumption || 0).toLocaleString('en-IN');
+      document.getElementById('metricPassedThrough').textContent = '₹' + (summary.money_passed_through || 0).toLocaleString('en-IN');
+      document.getElementById('metricDiscrepancy').textContent = '₹' + (summary.reconciliation_discrepancy_eliminated || 0).toLocaleString('en-IN');
+    }
+
+    function renderLedger(items) {
+      const tbody = document.getElementById('ledgerTableBody');
+      tbody.innerHTML = '';
+      document.getElementById('ledgerCountBadge').textContent = `${items.length} Entries Reconciled`;
+
+      items.forEach(item => {
+        const tr = document.createElement('tr');
+        const badgeClass = 'badge-' + (item.classification || 'unknown').toLowerCase();
+        const confPct = Math.round((item.confidence || 0) * 100);
+
+        tr.innerHTML = `
+          <td><span style="font-family: var(--mono); font-size: 11px; color: var(--text-muted);">${item.transaction_id || 'TXN'}</span></td>
+          <td>
+            <strong>${item.counterparty || 'Unknown'}</strong>
+            <div style="font-size: 11px; color: var(--text-muted);">${item.reasoning ? item.reasoning.substring(0, 48) + '...' : ''}</div>
+          </td>
+          <td><strong>₹${(item.amount || 0).toLocaleString('en-IN')}</strong></td>
+          <td><span class="badge ${badgeClass}">${item.classification}</span></td>
+          <td><span style="font-family: var(--mono); color: ${confPct >= 88 ? '#34d399' : '#f87171'};">${confPct}%</span></td>
+          <td style="font-family: var(--mono); font-weight: 600; color: ${item.consumption_amount > 0 ? '#f87171' : '#34d399'};">
+            ₹${(item.consumption_amount || 0).toLocaleString('en-IN')}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderMemories(memories) {
+      const container = document.getElementById('memoryListContainer');
+      container.innerHTML = '';
+
+      if (memories.length === 0) {
+        container.innerHTML = '<p style="font-size: 13px; color: var(--text-muted);">No counterparty memories recorded yet.</p>';
+        return;
+      }
+
+      memories.slice(0, 6).forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'cp-card';
+        div.innerHTML = `
+          <div class="cp-info">
+            <h4>${m.counterparty || m.key}</h4>
+            <p>${m.relationship || 'Contact'} &bull; Typical: <strong>${m.typical_intent || 'UNKNOWN'}</strong></p>
+            ${m.outstanding_loan > 0 ? `<div style="font-size: 11px; color: #fbbf24; font-weight: 600; margin-top: 4px;">Loan Outstanding: ₹${m.outstanding_loan}</div>` : ''}
+          </div>
+          <span class="badge badge-repayment">Conf: ${Math.round((m.confidence || 0.95) * 100)}%</span>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let recordStartTime = null;
+    let recordTimerInterval = null;
+
+    // Check Gnani Voice Integration Status on load
+    async function checkVoiceStatus() {
+      try {
+        const res = await fetch('/api/v1/voice/status');
+        const st = await res.json();
+        const metaEl = document.getElementById('voiceServiceMeta');
+        if (st.is_live) {
+          metaEl.innerHTML = `<span style="color: #34d399;">● Live Gnani AI Connected</span> &bull; STT: Vachana v3 &bull; TTS: Timbre v2.5`;
+        } else {
+          metaEl.innerHTML = `<span style="color: #fbbf24;">● Gnani Ready (Dev Mode)</span> &bull; Natural Hinglish Parser & Direct Synthesis`;
+        }
+      } catch (err) {
+        // silent fail
+      }
+    }
+
+    async function toggleRecording() {
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        stopRecording();
+      } else {
+        startRecording();
+      }
+    }
+
+    async function startRecording() {
+      const micBtn = document.getElementById('recordMicBtn');
+      const micIcon = document.getElementById('micIcon');
+      const statusText = document.getElementById('voiceStatusText');
+      const durationEl = document.getElementById('voiceDuration');
+      const stopBtn = document.getElementById('stopRecordBtn');
+
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          alert('Microphone access is not supported by your browser.');
+          return;
+        }
+
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        let mimeType = 'audio/webm;codecs=opus';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+          mimeType = 'audio/webm';
+          if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = ''; // Let browser pick default
+          }
+        }
+
+        mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0) {
+            audioChunks.push(event.data);
+          }
+        };
+
+        mediaRecorder.onstop = async () => {
+          clearInterval(recordTimerInterval);
+          micBtn.classList.remove('recording');
+          micIcon.textContent = '⏳';
+          statusText.textContent = 'Processing audio through Gnani pipeline...';
+          stopBtn.style.display = 'none';
+
+          // Stop all audio tracks
+          stream.getTracks().forEach(track => track.stop());
+
+          const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+          await sendAudioToPipeline(audioBlob, mediaRecorder.mimeType || 'audio/webm');
+
+          micIcon.textContent = '🎙️';
+          statusText.textContent = 'Click microphone to speak';
+          durationEl.style.display = 'none';
+        };
+
+        mediaRecorder.start(250); // collect 250ms chunks
+        recordStartTime = Date.now();
+        durationEl.textContent = '00:00';
+        durationEl.style.display = 'inline-block';
+
+        recordTimerInterval = setInterval(() => {
+          const sec = Math.floor((Date.now() - recordStartTime) / 1000);
+          const mm = String(Math.floor(sec / 60)).padStart(2, '0');
+          const ss = String(sec % 60).padStart(2, '0');
+          durationEl.textContent = `${mm}:${ss}`;
+        }, 500);
+
+        micBtn.classList.add('recording');
+        micIcon.textContent = '🔴';
+        statusText.textContent = 'Listening... Speak your transaction';
+        stopBtn.style.display = 'inline-block';
+      } catch (err) {
+        console.error('Microphone error:', err);
+        statusText.textContent = 'Microphone permission denied or unavailable';
+      }
+    }
+
+    function stopRecording() {
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+      }
+    }
+
+    async function sendAudioToPipeline(blob, mimeType) {
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onloadend = async () => {
+        const base64Data = reader.result;
+        try {
+          const res = await fetch('/api/v1/voice/reconcile_voice_pipeline', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              audio_base64: base64Data,
+              mime_type: mimeType,
+              language: 'hi-IN'
+            })
+          });
+
+          const result = await res.json();
+          renderVoiceResult(result);
+          await loadData();
+        } catch (err) {
+          console.error('Pipeline error:', err);
+          document.getElementById('voiceStatusText').textContent = 'Error processing voice note.';
+        }
+      };
+    }
+
+    function renderVoiceResult(res) {
+      const resultBox = document.getElementById('voiceResultBox');
+      const transcriptEl = document.getElementById('voiceTranscriptText');
+      const intentBadge = document.getElementById('voiceIntentBadge');
+      const cpBadge = document.getElementById('voiceCounterpartyBadge');
+      const budgetBadge = document.getElementById('voiceBudgetImpactBadge');
+      const responseMsg = document.getElementById('voiceResponseMsg');
+      const audioPlayer = document.getElementById('ttsAudioPlayer');
+
+      resultBox.classList.add('active');
+
+      if (res.status !== 'SUCCESS' || !res.transcript) {
+        transcriptEl.textContent = res.transcript || 'No speech recognized';
+        intentBadge.textContent = 'Intent: UNKNOWN';
+        cpBadge.textContent = 'Contact: -';
+        budgetBadge.textContent = 'Budget: ₹0';
+        responseMsg.textContent = res.message || res.response_text || 'Could not recognize speech. Please try again.';
+        audioPlayer.style.display = 'none';
+        return;
+      }
+
+      transcriptEl.textContent = `“${res.transcript}”`;
+      intentBadge.textContent = `Intent: ${res.reconciliation?.classification || res.parsed?.intent || 'UNKNOWN'}`;
+      cpBadge.textContent = `Contact: ${res.parsed?.counterparty || res.reconciliation?.counterparty || '-'}`;
+      budgetBadge.textContent = `Budget Impact: ₹${res.reconciliation?.budget_impact || 0}`;
+      responseMsg.textContent = res.response_text || '';
+
+      // Playback TTS
+      if (res.tts) {
+        if (res.tts.audio_url) {
+          audioPlayer.src = res.tts.audio_url;
+          audioPlayer.style.display = 'block';
+          audioPlayer.play().catch(e => console.warn('Auto-play blocked:', e));
+        } else if (res.tts.audio_base64) {
+          const blob = b64toBlob(res.tts.audio_base64, 'audio/wav');
+          const blobUrl = URL.createObjectURL(blob);
+          audioPlayer.src = blobUrl;
+          audioPlayer.style.display = 'block';
+          audioPlayer.play().catch(e => console.warn('Auto-play blocked:', e));
+        } else if (window.speechSynthesis && res.response_text) {
+          // Native browser speech synthesis fallback (disclosed as browser fallback)
+          audioPlayer.style.display = 'none';
+          try {
+            const utter = new SpeechSynthesisUtterance(res.response_text);
+            utter.lang = 'hi-IN';
+            window.speechSynthesis.speak(utter);
+          } catch (e) {
+            // speech synthesis unavailable
+          }
+        }
+      }
+    }
+
+    function b64toBlob(b64Data, contentType = 'audio/wav') {
+      const byteCharacters = atob(b64Data.replace(/^data:[^;]+;base64,/, ''));
+      const byteArrays = [];
+      for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+        const slice = byteCharacters.slice(offset, offset + 512);
+        const byteNumbers = new Array(slice.length);
+        for (let i = 0; i < slice.length; i++) {
+          byteNumbers[i] = slice.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        byteArrays.push(byteArray);
+      }
+      return new Blob(byteArrays, { type: contentType });
+    }
+
+    async function simulateVoice(text) {
+      const statusText = document.getElementById('voiceStatusText');
+      statusText.textContent = `Running pipeline for: "${text.substring(0, 32)}..."`;
+
+      try {
+        const res = await fetch('/api/v1/voice/reconcile_voice_pipeline', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transcript: text, language: 'hi-IN' })
+        });
+        const result = await res.json();
+        renderVoiceResult(result);
+        await loadData();
+        statusText.textContent = 'Click microphone to speak';
+      } catch (err) {
+        console.error('Simulate voice error:', err);
+      }
+    }
+
+    async function triggerBenchmark() {
+      const btn = document.getElementById('runBenchmarkBtn');
+      btn.innerHTML = '<span>⏳</span> Running 20 Evals...';
+      try {
+        const res = await fetch('/api/v1/benchmark/run', { method: 'POST' });
+        const report = await res.json();
+        btn.innerHTML = `<span>✅</span> ${report.passedCount}/${report.total} Passed (${report.accuracy}%)`;
+        await loadData();
+      } catch (err) {
+        btn.innerHTML = '<span>❌</span> Error';
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      // Load current production state from server without mutating or running benchmarks
+      await loadData();
+      await checkVoiceStatus();
+    });
+  </script>
+</body>
+</html>

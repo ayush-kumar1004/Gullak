@@ -1,0 +1,20 @@
+{
+  "name": "gullak-reconciliation-engine",
+  "version": "1.0.0",
+  "description": "Gullak Autonomous Personal Financial Reconciliation Engine for Pine Labs AgenticOrg",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/run_all_tests.js",
+    "test:all": "node test/run_all_tests.js",
+    "test:eval": "node test/run_20_evals.js",
+    "test:hardening": "node test/test_hardening_scenarios.js",
+    "test:mcp": "node test/test_mcp_contract.js",
+    "test:robustness": "node test/test_agenticorg_robustness.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.0",
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  }
+}

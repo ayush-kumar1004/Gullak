@@ -1,0 +1,14 @@
+# Part 1: Every Decision Made by the Agent
+
+| Timestamp | Input Scenario | Connector Used | Real Source | Agent Decision & Rule Applied | Exact Action / Message |
+|---|---|---|---|---|---|
+| 2026-10-02 09:15 | ₹450 debited at Swiggy | `reconcile_transaction` | Banking AA | Rule 3: Auto-classify known merchant consumption ($C = 0.94 \ge 0.88$). | Classified as `CONSUMPTION`. Consumption = ₹450. Discretionary budget adjusted. |
+| 2026-10-02 11:30 | ₹1,500 debited to `rahul@oksbi` | `check_counterparty_memory` $\to$ HITL | Banking AA | Rule 4: P2P transfer with no prior context is ambiguous ($C = 0.52 < 0.88$). | *"Ayush, what was the ₹1,500 sent to Rahul for?"* |
+| 2026-10-02 11:32 | User clarifies: *"I lent him the money."* | `record_counterparty_memory` $\to$ `reconcile_transaction` | User Voice / Text | Rule 5 & 9: Confirmed loan. Personal consumption is ₹0; loan receivable = ₹1,500. | *"Got it. I’ve marked ₹1,500 to Rahul as a loan, so it isn’t counted as your personal spending."* |
+| 2026-10-02 14:00 | ₹4,000 BBQ Nation bill | `reconcile_transaction` | Banking AA | Rule 9: User clarifies split (personal share ₹1,000, 3 friends owe ₹3,000). | Logged ₹1,000 consumption; ₹3,000 tracked as split receivable. Daily budget reduced only by ₹1,000. |
+| 2026-10-02 16:45 | ₹2,499 Amazon debit | `track_delhivery_shipment` | Delhivery Staging | Rule 3: Corroborated with logistics. Package status: `Delivered`. | Classified as `CONSUMPTION`. Package delivery confirmed. |
+| 2026-10-02 18:00 | ₹2,000 debited to `rahul@oksbi` | `check_counterparty_memory` | Banking AA | Rule 3 & 6: Reused confirmed memory (Rahul = LOAN) without re-asking. | Auto-classified as `LOAN`. Outstanding loan updated to ₹3,500. Consumption = ₹0. |
+| 2026-10-02 19:30 | ₹800 to Rahul (*"Dinner split at Toit"*) | `check_counterparty_memory` | Banking AA | Rule 6: **Contradiction detected!** Narration conflicts with loan memory ($C = 0.60 < 0.88$). | Flagged contradiction; asked user: *"You usually lend money to Rahul, but this narration says 'dinner split'. Is this a split or a loan?"* |
+| 2026-10-02 20:15 | Duplicate ₹450 Swiggy transaction | `reconcile_transaction` | Banking AA | Rule 16: Duplicate debit detected within seconds ($C = 0.65 < 0.88$). | Flagged duplicate transaction to prevent double-deduction. |
+| 2026-10-02 21:00 | ₹1,500 credited from `rahul@oksbi` | `check_counterparty_memory` | Banking AA | Rule 9: Repayment from borrower. Clears loan receivable; NOT new income. | Closed ₹1,500 loan receivable. Cash balance increased; discretionary budget unaffected. |
+| 2026-10-02 22:00 | ₹18,000 electronics debit | `adapt_daily_budget` | Banking AA | Rule 11: Extreme overspend. Savings goal (₹15,000) locked. | Prompted user for authorized tradeoff (buffer vs savings adjustment) instead of reducing savings. |
